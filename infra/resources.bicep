@@ -68,7 +68,7 @@ resource mysqlServer 'Microsoft.DBforMySQL/flexibleServers@2024-12-30' = {
     administratorLogin: mysqlAdminUsername
     administratorLoginPassword: mysqlAdminPassword
 
-    version: '8.0'
+    version: '8.4'
 
     storage: {
       storageSizeGB: 20
