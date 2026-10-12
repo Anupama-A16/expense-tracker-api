@@ -91,6 +91,63 @@ jobs:
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
 
 
+      # Initialize the Azure MySQL database schema before deploying the application.
+      # Temporarily allow the GitHub Actions runner IP, create the expenses table,
+      # and remove the temporary firewall rule afterward.
+      - name: Initialize MySQL schema
+        shell: bash
+        env:
+          MYSQL_ADMIN_PASSWORD: ${{ secrets.MYSQL_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          MYSQL_SERVER_NAME=$(az deployment sub show \
+            --name expense-dev-deployment \
+            --query properties.outputs.mysqlServerName.value \
+            --output tsv)
+
+          RESOURCE_GROUP=$(az deployment sub show \
+            --name expense-dev-deployment \
+            --query properties.outputs.resourceGroupName.value \
+            --output tsv)
+
+          MYSQL_HOST=$(az mysql flexible-server show \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$MYSQL_SERVER_NAME" \
+            --query fullyQualifiedDomainName \
+            --output tsv)
+
+          RUNNER_IP=$(curl -fsS https://api.ipify.org)
+          RULE_NAME="gha-${GITHUB_RUN_ID}"
+
+          cleanup() {
+            az mysql flexible-server firewall-rule delete \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$MYSQL_SERVER_NAME" \
+              --rule-name "$RULE_NAME" \
+              --yes \
+              --output none || true
+          }
+          trap cleanup EXIT
+
+          az mysql flexible-server firewall-rule create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$MYSQL_SERVER_NAME" \
+            --rule-name "$RULE_NAME" \
+            --start-ip-address "$RUNNER_IP" \
+            --end-ip-address "$RUNNER_IP" \
+            --output none
+
+          export MYSQL_HOST
+          export MYSQL_USER="expenseadmin"
+          export MYSQL_PASSWORD="$MYSQL_ADMIN_PASSWORD"
+          export MYSQL_DATABASE="expense_tracker"
+
+          python -m pip install -r requirements.txt
+          python -m app.init_db
+
+
+
       # -----------------------------------------
       # 7. Deploy Flask application
       # -----------------------------------------
