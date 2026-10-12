@@ -83,10 +83,6 @@ resource mysqlServer 'Microsoft.DBforMySQL/flexibleServers@2024-12-30' = {
     highAvailability: {
       mode: 'Disabled'
     }
-
-    dataEncryption: {
-      type: 'SystemManaged'
-    }
   }
 }
 
